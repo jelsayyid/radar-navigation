@@ -103,6 +103,7 @@ mapping uses real measurement-time odometry in the drive launch. The
 | `launch/drive.launch.py`, `base.launch.py` | Real base/odom, guarded commands and odom-frame radar composition |
 | `config/` | Installed default mount, radar profile, RViz and experimental Nav2 settings |
 | `radar_viewer.py` | Subscriber-only browser viewer by default |
+| `dca1000_capture/` | Standalone raw ADC (IQ) capture through a DCA1000EVM; not part of the ROS package |
 | `tests/`, `tests_ros/` | Offline and isolated-domain middleware/PTY tests |
 | `scripts/`, `docs/`, `results/` | Analysis, operation and compact experiment evidence |
 
