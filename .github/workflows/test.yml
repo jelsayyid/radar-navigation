@@ -17,6 +17,7 @@ jobs:
       - run: python -m radar_navigation.simulate --output /tmp/navigation.json
 
   humble:
+    name: Humble required middleware
     runs-on: ubuntu-22.04
     container: ros:humble-ros-base
     steps:
@@ -30,4 +31,34 @@ jobs:
           colcon build --symlink-install --packages-select radar_navigation
           source install/setup.bash
           python3 -m unittest discover -s tests -v
-          ROS_DOMAIN_ID=89 python3 -m unittest discover -s tests_ros -v
+          ROS_DOMAIN_ID=89 python3 scripts/run_required_ros_tests.py
+
+  nav2-diagnostic:
+    name: Humble Nav2 native teardown diagnostic (nonblocking)
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    container: ros:humble-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native diagnostic dependencies
+        run: apt-get update && apt-get install -y python3-serial ros-humble-nav2-costmap-2d
+      - name: Record package versions and linked libraries
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          dpkg-query -W 'ros-humble-nav2*' 'ros-humble-rclcpp*' 'ros-humble-rcl*' > diagnostics/packages.txt
+          ldd /opt/ros/humble/lib/nav2_costmap_2d/nav2_costmap_2d > diagnostics/ldd.txt
+      - name: Build and run native occupancy and teardown assertions
+        shell: bash
+        run: |
+          set -eo pipefail
+          source /opt/ros/humble/setup.bash
+          colcon build --symlink-install --packages-select radar_navigation
+          source install/setup.bash
+          ROS_DOMAIN_ID=89 python3 -m unittest discover -s tests_ros -p test_nav2_costmap.py -v 2>&1 | tee diagnostics/nav2-test.log
+      - name: Retain diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: humble-nav2-native-diagnostic
+          path: diagnostics/

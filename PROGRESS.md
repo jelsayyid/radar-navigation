@@ -384,3 +384,42 @@ records no additional physical trial or motion.
   tree matched the reviewed/staged tree exactly, and runtime hashes matched the
   physically smoke-tested code. This subsequent journal-only audit preserves
   the quantitative reconstruction without changing the tested runtime.
+
+### 2026-11-08 — Humble CI isolation and native teardown investigation
+
+Dedicated branch `fix/humble-nav2-teardown` based on current main `9f6d201`;
+no Jetson files, hardware processes, or movement commands changed. Existing
+engineering history retained. Main was re-fetched before submission and still
+matched the branch base.
+
+- Reviewed `test_nav2_costmap.py`, the Jetson GDB findings in
+  `docs/NAV2_NATIVE_TEARDOWN.md`, and Humble upstream costmap lifecycle code.
+  Jetson previously observed successful occupied/cleared map assertions followed
+  by SIGSEGV in `rclcpp::CallbackGroup::~CallbackGroup()`. Explicit lifecycle
+  shutdown and destroying the node/executor before ROS shutdown had already
+  failed to fix it. These earlier experiments were not misrepresented as new
+  cloud runs. Source review identified cleanup/executor destruction ordering
+  worth testing; upstream versus test race/ABI root cause remains undetermined.
+- Pulled the actual official Humble CI base image (digest in teardown document),
+  built radar_navigation with colcon, and executed the separated required suite
+  in ROS Humble/Python 3.10: **5 tests passed in 25.019 seconds**, including cloud
+  input, serial/watchdog, localization loss, complete stationary system/viewer
+  shutdown, and rejected-profile launch shutdown. No skips. The expected
+  rejected-profile child exit 1 is checked by its negative-path test.
+- Offline Python suite: **29 tests passed**. Diff whitespace checks passed.
+- Native reproduction blocked: apt update received HTTP 403 for
+  packages.ros.org/ros2/ubuntu/dists/jammy/InRelease, then installation reported
+  `Unable to locate package ros-humble-nav2-costmap-2d`. No signature/TLS bypass.
+  Base rclcpp family is version 16.0.21; exact builds recorded in teardown doc.
+  Native package version, ABI linkage and a new GDB trace remain unverified.
+- Required CI automatically discovers all ROS tests except the one explicitly
+  isolated Nav2 diagnostic. Separate, labeled job continues running the original
+  occupied/cleared assertions and strict process-exit check, with job-level
+  continue-on-error and always-uploaded diagnostic artifacts. Native executable
+  is invoked directly so SIGSEGV is visible as its real return code; cleanup
+  does not signal an already-exited process. No crash is accepted as a test pass.
+- GitHub API operations are separately blocked by HTTP CONNECT 403 for
+  api.github.com. Native reproduction, PR creation and actual Actions outcome
+  verification need environment network access. Draft additions for that domain
+  and packages.ros.org were saved; this does not apply runtime policy or publish.
+  No claim of remotely green CI or a fixed native crash is made.

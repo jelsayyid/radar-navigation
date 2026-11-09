@@ -21,7 +21,7 @@ import yaml
 class Nav2CostmapIntegration(unittest.TestCase):
     def test_occupied_then_expired(self):
         try:
-            get_package_prefix('nav2_costmap_2d')
+            prefix=get_package_prefix('nav2_costmap_2d')
         except PackageNotFoundError:
             self.skipTest('Nav2 costmap runtime not installed')
         rclpy.init()
@@ -54,7 +54,7 @@ class Nav2CostmapIntegration(unittest.TestCase):
             with tempfile.NamedTemporaryFile(mode='w',suffix='.yaml') as stream:
                 yaml.safe_dump({'/**':{'ros__parameters':params}},stream)
                 stream.flush()
-                process=subprocess.Popen(['ros2','run','nav2_costmap_2d','nav2_costmap_2d',
+                process=subprocess.Popen([str(Path(prefix)/'lib/nav2_costmap_2d/nav2_costmap_2d'),
                     '--ros-args','--params-file',stream.name],stdout=log,stderr=log,start_new_session=True)
                 client=node.create_client(ChangeState,'/costmap/costmap/change_state')
                 self.assertTrue(client.wait_for_service(timeout_sec=15.))
@@ -85,7 +85,7 @@ class Nav2CostmapIntegration(unittest.TestCase):
                 transition(2)
                 transition(5)
         finally:
-            if process:
+            if process is not None and process.poll() is None:
                 os.killpg(process.pid,signal.SIGINT)
                 try:
                     process.wait(timeout=5.)
@@ -94,12 +94,14 @@ class Nav2CostmapIntegration(unittest.TestCase):
                     process.wait()
             log.seek(0)
             output=log.read()
-            print(output[-4000:])
+            print(output)
+            print(f'Native costmap returncode: {process.returncode if process else "not started"}')
             log.close()
             node.destroy_node()
             rclpy.shutdown()
-            self.assertNotIn('Segmentation fault', output)
-            self.assertEqual(process.returncode, 0)
+            if process is not None:
+                self.assertNotIn('Segmentation fault', output)
+                self.assertEqual(process.returncode, 0, 'Native costmap must exit cleanly')
 
 
 if __name__=='__main__':
