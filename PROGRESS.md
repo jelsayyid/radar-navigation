@@ -715,3 +715,29 @@ records no additional physical trial or motion.
 - This final journal-only publication changes no tested runtime. All motor command
   processes are stopped, OpenCR still powered at 12.04 V, measured wheels zero.
   Floor experiment remains prepared but explicitly unauthorized, not performed.
+
+### 2026-11-09 — DCA1000EVM raw IQ capture (standalone; ROS pipeline unchanged)
+- Wenqian added standalone `dca1000_capture/` (branch hardware/dca1000-raw-capture):
+  raw ADC capture through a TI DCA1000EVM (FPGA 2.9) over the Jetson's wired port.
+  DCA1000 192.168.33.180; Jetson 192.168.33.30/24 via NetworkManager profile
+  `dca1000` (never-default, Wi-Fi keeps the default route); net.core.rmem_max
+  33554432. Not in the ROS package; setup.py, launch files and tests unaffected.
+- `dca1000_capture/awr1843_raw.cfg` is config/awr1843_profile.cfg with
+  lvdsStreamCfg -1 0 1 0. DCA1000 raw mode, 2 LVDS lanes, 16-bit, 1472-byte packets,
+  25 us packet delay. Captures of 30 and 20 frames: 10.0 frames/s, 0 packets lost,
+  1456 data bytes per packet; packet byte count is the stream offset before it.
+- Sample order for adcbufCfg SampleSwap=1 is Q0 Q1 I0 I1; TI's MATLAB reader assumes
+  I0 I1 Q0 Q1, which mirrors the spectrum. Checked against the TLV 2 zero-Doppler
+  range profile captured over UART in the same run: correlation 1.000, versus 0.02
+  for I0 I1 Q0 Q1. Leakage-bin phase stable to 0.1 deg median over all chirps and
+  frames; frame 0 aligned.
+- Point cloud TLVs continued during LVDS streaming; Doppler filter and pipeline need
+  no change. Capture and awr1843_driver both own the radar command port and cannot
+  run together; that would need the driver to send lvdsStreamCfg -1 0 1 0 and the
+  DCA1000 armed before sensorStart (the raw stream has no frame markers).
+- Hardware: radar CLI silent while the DCA1000 was attached but unpowered (cause not
+  isolated). DCA1000 power switch at RADAR_5V_IN with the radar adapter feeding both
+  boards gave repeated resets (blinking PWR/WARM_RST, no USB or Ethernet); stopped
+  after the operator changed the supply setup. DIP switch SW2 position 5 must be
+  SW_CONFIG. Jetson restarted without a clean shutdown around 17:11 (cause not
+  established).
